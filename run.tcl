@@ -36,17 +36,16 @@ proc main {} {
 
     ttk::frame .buttons.s1
 
-    ttk::button .buttons.run -text Run -command run -underline 0
     ttk::button .buttons.browse -text Browse... -command browse -underline 0
-    grid .buttons.w .buttons.s1 .buttons.run .buttons.browse -sticky ew -pady 5 -pady 5
-    grid columnconfigure .buttons {1 2 3} -uniform a
+    grid .buttons.w .buttons.s1 - - .buttons.browse -sticky ew -pady 5 -pady 5
+    grid columnconfigure .buttons {1 2 3 4} -uniform a
 
     pack .input -fill x -expand true -padx 5 -pady 5
     pack .buttons -fill x -padx 5 -pady 0 -expand true
 
     bind . <Escape> quit
     bind .input.e <Tab> completion
-    bind .input.e <Key-Return> [list .buttons.run invoke]
+    bind .input.e <Key-Return> run
     bind .input.e <Key-Down> {
         .input.menu post [winfo rootx .input.e] [expr {[winfo rooty .input.e] + [winfo height .input.e]}]
         after idle focus .input.menu
@@ -68,7 +67,6 @@ proc main {} {
         }
     }
     bind . <Map> {wm geometry . [winfo reqwidth .]x[winfo reqheight .]}
-    bind . <Alt-r> [list .buttons.run invoke]
     bind . <Alt-b> [list .buttons.browse invoke]
     bind . <Alt-h> {
         .buttons.w.m.menu post [winfo rootx .buttons.w.m] [expr {[winfo rooty .buttons.w.m] + [winfo height .buttons.w.m]}]
