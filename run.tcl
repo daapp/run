@@ -12,16 +12,6 @@ set history_size 20
 set hostlist {rpi2w}
 set term stdout
 
-# do various program require xterm
-array set xterm {
-    grep 1
-    sed 1
-    netscape* 0
-    awk 1
-    tar 1
-    mc 1
-}
-
 
 proc main {} {
     global hostlist host
