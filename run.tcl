@@ -29,6 +29,7 @@ proc main {} {
     ttk::label .input.l -text "Command: "
     ttk::entry .input.e -textvariable command -exportselection false
     menu .input.menu -tearoff 0
+    menu .input.completion_menu -tearoff 0
     readhistory .input.menu
     pack .input.l .input.e -side left -fill y
     pack .input.e -fill x -expand true
@@ -42,16 +43,16 @@ proc main {} {
 
     ttk::frame .buttons.s1
 
-    ttk::button .buttons.run -text Run -command run
-    ttk::button .buttons.cancel -text Cancel -command quit
-    ttk::button .buttons.browse -text Browse... -command browse
-    grid .buttons.w .buttons.s1 .buttons.run .buttons.cancel .buttons.browse -sticky ew -pady 5 -pady 5
+    ttk::button .buttons.run -text Run -command run -underline 0
+    ttk::button .buttons.browse -text Browse... -command browse -underline 0
+    grid .buttons.w .buttons.s1 .buttons.run .buttons.browse -sticky ew -pady 5 -pady 5
     grid columnconfigure .buttons {1 2 3} -uniform a
 
     pack .input -fill x -expand true -padx 5 -pady 5
     pack .buttons -fill x -padx 5 -pady 0 -expand true
 
     bind . <Escape> quit
+    bind .input.e <Tab> completion
     bind .input.e <Key-Return> [list .buttons.run invoke]
     bind .input.e <Key-Down> {
         .input.menu post [winfo rootx .input.e] [expr {[winfo rooty .input.e] + [winfo height .input.e]}]
@@ -63,7 +64,28 @@ proc main {} {
             .input.e icursor end
         }
     }
+    bind .input.completion_menu <Escape> {
+        %W unpost
+        after idle {focus -force .input.e}
+    }
+    bind .input.completion_menu <Unmap> {
+        after idle {
+            focus -force .input.e
+            .input.e icursor end
+        }
+    }
     bind . <Map> {wm geometry . [winfo reqwidth .]x[winfo reqheight .]}
+    bind . <Alt-r> [list .buttons.run invoke]
+    bind . <Alt-b> [list .buttons.browse invoke]
+    bind . <Alt-h> {
+        .buttons.w.m.menu post [winfo rootx .buttons.w.m] [expr {[winfo rooty .buttons.w.m] + [winfo height .buttons.w.m]}]
+        after idle focus .buttons.w.m.menu
+    }
+    bind .buttons.w.m.menu <Unmap> {
+        after idle {
+            focus -force .input.e
+        }
+    }
 
     wm title . Run
     wm positionfrom . program
@@ -85,12 +107,12 @@ proc quit {} {
 #
 proc browse {} {
     set name [tk_getOpenFile ]
-    if {"$name"==""} return
-    if [.i.e selection present] {
-        .i.e delete sel.first sel.last
-        .i.e insert sel.first $name
+    if {"$name" == ""} return
+    if [.input.e selection present] {
+        .input.e delete sel.first sel.last
+        .input.e insert sel.first $name
     } else {
-        .i.e insert insert $name
+        .input.e insert insert $name
     }
 }
 
@@ -140,5 +162,31 @@ proc readhistory {menu} {
     }
 }
 
+
+proc completion {} {
+    set text [.input.e get]
+    if {[string length $text] >= 3} {
+        .input.completion_menu delete 0 end
+        package require fileutil
+        set found [list]
+        foreach path [split $::env(PATH) :] {
+            foreach file [fileutil::findByPattern $path -glob $text*] {
+                lappend found [lindex [file split $file] end]
+            }
+        }
+        if {[llength $found] > 0} {
+            foreach file [lrange $found 0 4] {
+                .input.completion_menu add command -label $file -command [list set command $file]
+            }
+            if {[llength $found] > 5} {
+                .input.completion_menu add command -label "[expr {[llength $found] - 5}] command(s) hidden ..."
+            }
+            .input.completion_menu post [winfo rootx .input.e] [expr {[winfo rooty .input.e] + [winfo height .input.e]}]
+            after idle focus .input.completion_menu
+        }
+    }
+    # stop focus to next widget
+    return -code break
+}
 
 main
