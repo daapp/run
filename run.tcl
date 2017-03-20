@@ -2,6 +2,9 @@
 # \
 exec tclsh "$0" ${1+"$@"}
 
+# (c) 2017 Alexander Danilov <alexander.a.danilov@gmail.com>
+# tcllib (fileutil package) required to run this application.
+
 package require Tk
 package require Ttk
 
