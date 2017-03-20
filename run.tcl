@@ -3,12 +3,14 @@
 exec tclsh "$0" ${1+"$@"}
 
 package require Tk
+package require Ttk
 
 # Maximum size of history file
 set history_size 20
 
 #list of hosts, which you use to connect via rsh (look into you .rhosts)
-set hostlist {rhine mod env amazon}
+set hostlist {rpi2w}
+set term stdout
 
 # do various program require xterm
 array set xterm {
@@ -21,29 +23,28 @@ array set xterm {
 }
 
 
-proc layout {} {
+proc main {} {
     global hostlist host
-    frame .input
-    label .input.l -text "Command: "
-    entry .input.e -background white -textvariable command -exportselection false
-    menubutton .input.history -pady 0 -text V -menu .input.history.m -relief raised
-    menu .input.history.m
-    readhistory .input.history.m
-    pack .input.l .input.e .input.history -side left -fill y
+    ttk::frame .input
+    ttk::label .input.l -text "Command: "
+    ttk::entry .input.e -textvariable command -exportselection false
+    menu .input.menu -tearoff 0
+    readhistory .input.menu
+    pack .input.l .input.e -side left -fill y
     pack .input.e -fill x -expand true
 
-    frame .buttons
+    ttk::frame .buttons
 
-    frame .buttons.w
-    label .buttons.w.l -text "Host: " -anchor w
+    ttk::frame .buttons.w
+    ttk::label .buttons.w.l -text "Host: " -anchor w
     eval tk_optionMenu .buttons.w.m host localhost $hostlist
     pack .buttons.w.l .buttons.w.m -side left
 
-    frame .buttons.s1 -padx 5
+    ttk::frame .buttons.s1
 
-    button .buttons.run -text Run -command run
-    button .buttons.cancel -text Cancel -command quit
-    button .buttons.browse -text Browse... -command browse
+    ttk::button .buttons.run -text Run -command run
+    ttk::button .buttons.cancel -text Cancel -command quit
+    ttk::button .buttons.browse -text Browse... -command browse
     grid .buttons.w .buttons.s1 .buttons.run .buttons.cancel .buttons.browse -sticky ew -pady 5 -pady 5
     grid columnconfigure .buttons {1 2 3} -uniform a
 
@@ -52,6 +53,16 @@ proc layout {} {
 
     bind . <Escape> quit
     bind .input.e <Key-Return> [list .buttons.run invoke]
+    bind .input.e <Key-Down> {
+        .input.menu post [winfo rootx .input.e] [expr {[winfo rooty .input.e] + [winfo height .input.e]}]
+        after idle focus .input.menu
+    }
+    bind .input.menu <Unmap> {
+        after idle {
+            focus -force .input.e
+            .input.e icursor end
+        }
+    }
     bind . <Map> {wm geometry . [winfo reqwidth .]x[winfo reqheight .]}
 
     wm title . Run
@@ -64,6 +75,7 @@ proc layout {} {
 
 
 proc quit {} {
+    destroy .
     exit 0
 }
 
@@ -90,12 +102,12 @@ proc run {} {
     if {"$host"=="localhost" } {
         exec /bin/sh -c $command >/dev/$term </dev/$term 2>/dev/$term &
     } else {
-        exec rsh $host $command >/dev/$term </dev/$term 2>/dev/$term &
+        exec rsh -X $host $command >/dev/$term </dev/$term 2>/dev/$term &
     }
     set f [open ~/.run_history a+]
     puts $f $command
     close $f
-    destroy .
+    quit
 }
 
 #
@@ -128,5 +140,5 @@ proc readhistory {menu} {
     }
 }
 
-set term stdout
-layout
+
+main
