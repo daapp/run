@@ -184,7 +184,7 @@ proc completion {} {
                     .input.completion_menu add command -label $file -command [list set command $file]
                 }
                 if {[llength $found] > $::menu_size} {
-                    .input.completion_menu add command -label "[expr {[llength $found] - 5}] command(s) hidden ..."
+                    .input.completion_menu add command -label "[expr {[llength $found] - $::menu_size}] command(s) hidden ..."
                 }
                 .input.completion_menu post [winfo rootx .input.e] [expr {[winfo rooty .input.e] + [winfo height .input.e]}]
                 .input.completion_menu activate 0
