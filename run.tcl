@@ -11,9 +11,14 @@ package require Ttk
 # Maximum size of history file
 set history_size 20
 
+# Maximum menu size
+set menu_size 10
+
 #list of hosts, which you use to connect via rsh (look into you .rhosts)
 set hostlist {nas}
 set term stdout
+
+set command ""
 
 
 proc main {} {
@@ -47,8 +52,13 @@ proc main {} {
     bind .input.e <Tab> completion
     bind .input.e <Key-Return> run
     bind .input.e <Key-Down> {
-        .input.menu post [winfo rootx .input.e] [expr {[winfo rooty .input.e] + [winfo height .input.e]}]
-        after idle focus .input.menu
+        if {$command ne ""} {
+            .input.completion_menu activate 0
+            after idle focus .input.completion_menu
+        } else {
+            .input.menu post [winfo rootx .input.e] [expr {[winfo rooty .input.e] + [winfo height .input.e]}]
+            after idle focus .input.menu
+        }
     }
     bind .input.menu <Unmap> {
         after idle {
@@ -170,13 +180,14 @@ proc completion {} {
                 set ::command [lindex $found 0]
                 .input.e icursor end
             } else {
-                foreach file [lrange $found 0 4] {
+                foreach file [lrange $found 0 [expr {$::menu_size - 1}]] {
                     .input.completion_menu add command -label $file -command [list set command $file]
                 }
-                if {[llength $found] > 5} {
+                if {[llength $found] > $::menu_size} {
                     .input.completion_menu add command -label "[expr {[llength $found] - 5}] command(s) hidden ..."
                 }
                 .input.completion_menu post [winfo rootx .input.e] [expr {[winfo rooty .input.e] + [winfo height .input.e]}]
+                .input.completion_menu activate 0
                 after idle focus .input.completion_menu
             }
         }
