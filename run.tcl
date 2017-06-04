@@ -12,7 +12,7 @@ package require Ttk
 set history_size 20
 
 #list of hosts, which you use to connect via rsh (look into you .rhosts)
-set hostlist {rpi2w}
+set hostlist {nas}
 set term stdout
 
 
@@ -166,14 +166,19 @@ proc completion {} {
             }
         }
         if {[llength $found] > 0} {
-            foreach file [lrange $found 0 4] {
-                .input.completion_menu add command -label $file -command [list set command $file]
+            if {[llength $found] == 1} {
+                set ::command [lindex $found 0]
+                .input.e icursor end
+            } else {
+                foreach file [lrange $found 0 4] {
+                    .input.completion_menu add command -label $file -command [list set command $file]
+                }
+                if {[llength $found] > 5} {
+                    .input.completion_menu add command -label "[expr {[llength $found] - 5}] command(s) hidden ..."
+                }
+                .input.completion_menu post [winfo rootx .input.e] [expr {[winfo rooty .input.e] + [winfo height .input.e]}]
+                after idle focus .input.completion_menu
             }
-            if {[llength $found] > 5} {
-                .input.completion_menu add command -label "[expr {[llength $found] - 5}] command(s) hidden ..."
-            }
-            .input.completion_menu post [winfo rootx .input.e] [expr {[winfo rooty .input.e] + [winfo height .input.e]}]
-            after idle focus .input.completion_menu
         }
     }
     # stop focus to next widget
