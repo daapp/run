@@ -20,6 +20,8 @@ set term stdout
 
 set command ""
 
+# xterm command for ssh prefix
+set xterm "xterm -e"
 
 proc main {} {
     global hostlist host
@@ -121,8 +123,11 @@ proc browse {} {
 # Runs desired command and records it in the history file
 #
 proc run {} {
-    global command term host
-    if {"$host"=="localhost" } {
+    global command term host xterm
+    set command [string trim $command]
+    if {[string match "ssh *" $command]} {
+        exec {*}$xterm $command &
+    } elseif {"$host" eq "localhost" } {
         exec /bin/sh -c $command >/dev/$term </dev/$term 2>/dev/$term &
     } else {
         exec rsh -X $host $command >/dev/$term </dev/$term 2>/dev/$term &
