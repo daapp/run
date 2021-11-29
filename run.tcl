@@ -12,7 +12,7 @@ package require Ttk
 set history_size 20
 
 # Maximum menu size
-set menu_size 10
+set completionMenuSize 30
 
 #list of hosts, which you use to connect via rsh (look into you .rhosts)
 set hostlist {nas}
@@ -25,68 +25,76 @@ set xterm "xterm -e"
 
 proc main {} {
     global hostlist host
-    ttk::frame .input
-    ttk::label .input.l -text "Command: "
-    ttk::entry .input.e -textvariable command -exportselection false
-    menu .input.menu -tearoff 0
-    menu .input.completion_menu -tearoff 0
-    readhistory .input.menu
-    pack .input.l .input.e -side left -fill y
-    pack .input.e -fill x -expand true
 
-    ttk::frame .buttons
+    ttk::label .l1 -text "Command:"
+    ttk::entry .command \
+               -textvariable command \
+               -exportselection false
+    button .browse \
+                -text ... \
+                -underline 0 \
+                -command [list browse .command]
+    
+    ttk::label .l2 -text "Host:"
+    eval tk_optionMenu .hostMenu host localhost $hostlist
 
-    ttk::frame .buttons.w
-    ttk::label .buttons.w.l -text "Host: " -anchor w
-    eval tk_optionMenu .buttons.w.m host localhost $hostlist
-    pack .buttons.w.l .buttons.w.m -side left
+    ttk::separator .s1 -orient horizontal
 
-    ttk::frame .buttons.s1
+    ttk::button .run \
+                -text Run \
+                -underline 0 \
+                -command [list run]
 
-    ttk::button .buttons.browse -text Browse... -command browse -underline 0
-    grid .buttons.w .buttons.s1 - - .buttons.browse -sticky ew -pady 5 -pady 5
-    grid columnconfigure .buttons {1 2 3 4} -uniform a
+    grid .l1 .command .browse -sticky e -padx 5 -pady 2
+    grid .l2 .hostMenu x -sticky e -padx 5 -pady 2
+    grid .s1 - - -sticky ew -padx 5 -pady 5
+    grid x .run - -sticky e -padx 5 -pady 5
+    grid columnconfigure . .command -weight 2
+    grid anchor .run e
 
-    pack .input -fill x -expand true -padx 5 -pady 5
-    pack .buttons -fill x -padx 5 -pady 0 -expand true
+    menu .historyMenu -tearoff 0
+    menu .completionMenu -tearoff 0
+    readhistory .historyMenu
+
 
     bind . <Escape> quit
-    bind .input.e <Tab> completion
-    bind .input.e <Key-Return> run
-    bind .input.e <Key-Down> {
+    bind .command <Tab> [list completion .completionMenu .command]
+    bind .command <Key-Return> run
+    bind .command <Key-Down> {
         if {$command ne ""} {
-            .input.completion_menu activate 0
-            after idle focus .input.completion_menu
+            .completionMenu activate 0
+            after idle focus .completionMenu
         } else {
-            .input.menu post [winfo rootx .input.e] [expr {[winfo rooty .input.e] + [winfo height .input.e]}]
-            after idle focus .input.menu
+            .historyMenu post [winfo rootx .command] [expr {[winfo rooty .command] + [winfo height .command]}]
+            after idle focus .historyMenu
         }
     }
-    bind .input.menu <Unmap> {
+    bind .historyMenu <Unmap> {
         after idle {
-            focus -force .input.e
-            .input.e icursor end
+            focus -force .command
+            .command icursor end
         }
     }
-    bind .input.completion_menu <Escape> {
+    bind .completionMenu <Escape> {
         %W unpost
-        after idle {focus -force .input.e}
+        after idle {focus -force .command}
     }
-    bind .input.completion_menu <Unmap> {
+    bind .completionMenu <Unmap> {
         after idle {
-            focus -force .input.e
-            .input.e icursor end
+            focus -force .command
+            .command icursor end
         }
     }
     bind . <Map> {wm geometry . [winfo reqwidth .]x[winfo reqheight .]}
-    bind . <Alt-b> [list .buttons.browse invoke]
+    bind . <Alt-b> [list .browse invoke]
+    bind . <Alt-r> run
     bind . <Alt-h> {
-        .buttons.w.m.menu post [winfo rootx .buttons.w.m] [expr {[winfo rooty .buttons.w.m] + [winfo height .buttons.w.m]}]
-        after idle focus .buttons.w.m.menu
+        .hostMenu.menu post [winfo rootx .hostMenu] [expr {[winfo rooty .hostMenu] + [winfo height .hostMenu]}]
+        after idle focus .hostMenu.menu
     }
-    bind .buttons.w.m.menu <Unmap> {
+    bind .hostMenu.menu <Unmap> {
         after idle {
-            focus -force .input.e
+            focus -force .command
         }
     }
 
@@ -95,7 +103,7 @@ proc main {} {
     wm resizable . 0 0
 
     tk app Run
-    focus -force .input.e
+    focus -force .command
 }
 
 
@@ -108,15 +116,18 @@ proc quit {} {
 # Pops up standard file selection dialog and inserts selected file into
 # command line. Note - not only as command, but as argument as well
 #
-proc browse {} {
+proc browse {command} {
     set name [tk_getOpenFile ]
     if {"$name" == ""} return
-    if [.input.e selection present] {
-        .input.e delete sel.first sel.last
-        .input.e insert sel.first $name
+
+    if [$command selection present] {
+        $command delete sel.first sel.last
+        $command insert sel.first $name
     } else {
-        .input.e insert insert $name
+        $command insert insert $name
     }
+    focus $command
+    $command xview end 
 }
 
 #
@@ -124,9 +135,10 @@ proc browse {} {
 #
 proc run {} {
     global command term host xterm
+
     set command [string trim $command]
     if {[string match "ssh *" $command]} {
-        exec {*}$xterm $command &
+        exec {*}$xterm "auto$command" &
     } elseif {"$host" eq "localhost" } {
         exec /bin/sh -c $command >/dev/$term </dev/$term 2>/dev/$term &
     } else {
@@ -169,10 +181,10 @@ proc readhistory {menu} {
 }
 
 
-proc completion {} {
-    set text [.input.e get]
+proc completion {menuName command} {
+    set text [$command get]
     if {[string length $text] >= 3} {
-        .input.completion_menu delete 0 end
+        $menuName delete 0 end
         package require fileutil
         set found [list]
         foreach path [split $::env(PATH) :] {
@@ -183,17 +195,17 @@ proc completion {} {
         if {[llength $found] > 0} {
             if {[llength $found] == 1} {
                 set ::command [lindex $found 0]
-                .input.e icursor end
+                $command icursor end
             } else {
-                foreach file [lrange $found 0 [expr {$::menu_size - 1}]] {
-                    .input.completion_menu add command -label $file -command [list set command $file]
+                foreach file [lrange $found 0 [expr {$::completionMenuSize - 1}]] {
+                    $menuName add command -label $file -command [list set command $file]
                 }
-                if {[llength $found] > $::menu_size} {
-                    .input.completion_menu add command -label "[expr {[llength $found] - $::menu_size}] command(s) hidden ..."
+                if {[llength $found] > $::completionMenuSize} {
+                    $menuName add command -label "[expr {[llength $found] - $::completionMenuSizey}] command(s) hidden ..."
                 }
-                .input.completion_menu post [winfo rootx .input.e] [expr {[winfo rooty .input.e] + [winfo height .input.e]}]
-                .input.completion_menu activate 0
-                after idle focus .input.completion_menu
+                $menuName post [winfo rootx $command] [expr {[winfo rooty $command] + [winfo height $command]}]
+                $menuName activate 0
+                after idle focus $menuName
             }
         }
     }
