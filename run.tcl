@@ -18,7 +18,7 @@ set command ""
 
 
 proc main {} {
-    ttk::label .l1 -text "Command:"
+    ttk::label .l1 -text "Shell command:"
     ttk::entry .command \
         -textvariable command \
         -exportselection false
@@ -29,17 +29,30 @@ proc main {} {
     
     ttk::separator .s1 -orient horizontal
 
-    ttk::button .run \
-                -text Run \
-                -underline 0 \
-                -command [list run]
-
+    ttk::frame .help
+    set font [font configure TkDefaultFont]
+    dict set font -size [expr {int([dict get $font -size] * 0.8)}]
+    puts $font
+    set r 0
+    foreach {key desc} {
+        ENTER "run command"
+        ESCAPE quit
+        ↓ "show history"
+        "3 characters + Tab" completion
+    } {
+        label .help.key$r -text $key -font $font
+        label .help.desc$r -text "- $desc." -font $font
+        grid .help.key$r .help.desc$r -sticky w
+        incr r
+    }
+    grid columnconfigure .help 1 -weight 1
+    
     grid .l1 .command .browse -sticky e -padx 5 -pady 2
 
     grid .s1 - - -sticky ew -padx 5 -pady 5
-    grid x .run - -sticky e -padx 5 -pady 5
+    grid .help - - -sticky we -padx 5 -pady 5
     grid columnconfigure . .command -weight 2
-    grid anchor .run e
+    #grid anchor .run e
 
     menu .historyMenu -tearoff 0
     menu .completionMenu -tearoff 0
@@ -75,7 +88,6 @@ proc main {} {
     }
     bind . <Map> {wm geometry . [winfo reqwidth .]x[winfo reqheight .]}
     bind . <Alt-b> [list .browse invoke]
-    bind . <Alt-r> run
 
     wm title . Run
     wm positionfrom . program
