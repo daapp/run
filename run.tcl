@@ -9,35 +9,24 @@ package require Tk
 package require Ttk
 
 # Maximum size of history file
-set history_size 20
+set historySize 20
 
 # Maximum menu size
 set completionMenuSize 30
-
-#list of hosts, which you use to connect via rsh (look into you .rhosts)
-set hostlist {nas}
 set term stdout
-
 set command ""
 
-# xterm command for ssh prefix
-set xterm "xterm -e"
 
 proc main {} {
-    global hostlist host
-
     ttk::label .l1 -text "Command:"
     ttk::entry .command \
-               -textvariable command \
-               -exportselection false
+        -textvariable command \
+        -exportselection false
     button .browse \
-                -text ... \
-                -underline 0 \
-                -command [list browse .command]
+        -text Browse \
+        -underline 0 \
+        -command [list browse .command]
     
-    ttk::label .l2 -text "Host:"
-    eval tk_optionMenu .hostMenu host localhost $hostlist
-
     ttk::separator .s1 -orient horizontal
 
     ttk::button .run \
@@ -46,7 +35,7 @@ proc main {} {
                 -command [list run]
 
     grid .l1 .command .browse -sticky e -padx 5 -pady 2
-    grid .l2 .hostMenu x -sticky e -padx 5 -pady 2
+
     grid .s1 - - -sticky ew -padx 5 -pady 5
     grid x .run - -sticky e -padx 5 -pady 5
     grid columnconfigure . .command -weight 2
@@ -54,8 +43,7 @@ proc main {} {
 
     menu .historyMenu -tearoff 0
     menu .completionMenu -tearoff 0
-    readhistory .historyMenu
-
+    readMenu .historyMenu history [list]
 
     bind . <Escape> quit
     bind .command <Tab> [list completion .completionMenu .command]
@@ -88,15 +76,6 @@ proc main {} {
     bind . <Map> {wm geometry . [winfo reqwidth .]x[winfo reqheight .]}
     bind . <Alt-b> [list .browse invoke]
     bind . <Alt-r> run
-    bind . <Alt-h> {
-        .hostMenu.menu post [winfo rootx .hostMenu] [expr {[winfo rooty .hostMenu] + [winfo height .hostMenu]}]
-        after idle focus .hostMenu.menu
-    }
-    bind .hostMenu.menu <Unmap> {
-        after idle {
-            focus -force .command
-        }
-    }
 
     wm title . Run
     wm positionfrom . program
@@ -134,30 +113,26 @@ proc browse {command} {
 # Runs desired command and records it in the history file
 #
 proc run {} {
-    global command term host xterm
+    global command term
 
     set command [string trim $command]
-    if {[string match "ssh *" $command]} {
-        exec {*}$xterm "auto$command" &
-    } elseif {"$host" eq "localhost" } {
+    if {$command ne ""} {
         exec /bin/sh -c $command >/dev/$term </dev/$term 2>/dev/$term &
-    } else {
-        exec rsh -X $host $command >/dev/$term </dev/$term 2>/dev/$term &
+        set f [open ~/.run_history a+]
+        puts $f $command
+        close $f
     }
-    set f [open ~/.run_history a+]
-    puts $f $command
-    close $f
     quit
 }
 
-#
-# Reads history file. If it is too long, deletes first few items and rewrites
-# file. Inserts commands from history file in given menu
-#
-proc readhistory {menu} {
-    global history_size
-    if [catch {open ~/.run_history} f] {
-        $menu add command -label xterm -command "set command xterm"
+
+proc readMenu {menu name defaultValues} {
+    global historySize
+
+    if {[catch {open ~/.run_$name} f]} {
+        foreach v $defaultValues {
+            $menu add command -label $v -command [list set command $v]
+        }
     } else {
         set list {}
         while {![eof $f]} {
@@ -166,11 +141,11 @@ proc readhistory {menu} {
             set list [linsert $list 0 $entry]
         }
         close $f
-        if {[llength $list]>$history_size} {
-            set list [lreplace $list $history_size end]
-            set f [open ~/.run_history w]
-            for {set i [expr $history_size-1]} {$i>=0} {incr i -1} {
-                puts $f [lindex $list $i]
+        if {[llength $list] > $historySize} {
+            set list [lreplace $list $historySize end]
+            set f [open ~/.run_$name w]
+            foreach h [lrange $list 0 $historySize] {
+                puts $f $h
             }
             close $f
         }
