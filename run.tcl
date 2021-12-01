@@ -7,6 +7,8 @@ exec tclsh "$0" ${1+"$@"}
 package require Tk
 package require Ttk
 
+catch {package require fsdialog}
+
 # minimal number of characters for completion
 set minCompletionSize 3
 
