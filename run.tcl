@@ -3,16 +3,19 @@
 exec tclsh "$0" ${1+"$@"}
 
 # (c) 2017 Alexander Danilov <alexander.a.danilov@gmail.com>
-# tcllib (fileutil package) required to run this application.
 
 package require Tk
 package require Ttk
+
+# minimal number of characters for completion
+set minCompletionSize 3
 
 # Maximum size of history file
 set historySize 20
 
 # Maximum menu size
 set completionMenuSize 30
+
 set term stdout
 set command ""
 
@@ -25,7 +28,7 @@ proc main {} {
     button .browse \
         -text Browse \
         -underline 0 \
-        -command [list browse .command]
+        -command {browse .command}
     
     ttk::separator .s1 -orient horizontal
 
@@ -87,7 +90,7 @@ proc main {} {
         }
     }
     bind . <Map> {wm geometry . [winfo reqwidth .]x[winfo reqheight .]}
-    bind . <Alt-b> [list .browse invoke]
+    bind . <Alt-b> {.browse invoke}
 
     wm title . Run
     wm positionfrom . program
@@ -169,8 +172,10 @@ proc readMenu {menu name defaultValues} {
 
 
 proc completion {menuName command} {
+    global minCompletionSize
+
     set text [$command get]
-    if {[string length $text] >= 3} {
+    if {[string length $text] >= $minCompletionSize} {
         $menuName delete 0 end
         package require fileutil
         set found [list]
