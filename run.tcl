@@ -2,7 +2,7 @@
 # \
 exec tclsh "$0" ${1+"$@"}
 
-# (c) 2017 Alexander Danilov <alexander.a.danilov@gmail.com>
+# (c) 2017-2021 Alexander Danilov <alexander.a.danilov@gmail.com>
 
 package require Tk
 package require Ttk
@@ -22,6 +22,15 @@ set term stdout
 set command ""
 
 
+ttk::style configure TButton \
+    -background lightblue \
+    -foreground black \
+    -padding {0 7} \
+    -width -4
+ttk::style map TButton \
+    -background [list active lightblue] \
+    -foreground [list disabled black]
+
 proc main {} {
     ttk::label .l1 -text "Shell command:"
     ttk::entry .command \
@@ -40,24 +49,22 @@ proc main {} {
     puts $font
     set r 0
     foreach {key desc} {
-        ENTER "run command"
-        ESCAPE quit
+        ⏎ "run command"
+        Esc quit
         ↓ "show history"
-        "3 characters + Tab" completion
+        ⭾ "completion (after 3 characters)"
     } {
-        label .help.key$r -text $key -font $font
-        label .help.desc$r -text "- $desc." -font $font
-        grid .help.key$r .help.desc$r -sticky w
+        ttk::button .help.key$r -text $key -state disabled;# -font $font
+        label .help.desc$r -text "- $desc." ;#-font $font
+        grid .help.key$r .help.desc$r -sticky w -pady 3
         incr r
     }
-    grid columnconfigure .help 1 -weight 1
-    
+   
     grid .l1 .command .browse -sticky e -padx 5 -pady 2
 
     grid .s1 - - -sticky ew -padx 5 -pady 5
     grid .help - - -sticky we -padx 5 -pady 5
     grid columnconfigure . .command -weight 2
-    #grid anchor .run e
 
     menu .historyMenu -tearoff 0
     menu .completionMenu -tearoff 0
