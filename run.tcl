@@ -9,6 +9,10 @@ package require Ttk
 
 catch {package require fsdialog}
 
+set xterm xterm
+set pager less
+set dict dict
+
 # minimal number of characters for completion
 set minCompletionSize 3
 
@@ -46,20 +50,26 @@ proc main {} {
     ttk::frame .help
     set font [font configure TkDefaultFont]
     dict set font -size [expr {int([dict get $font -size] * 0.8)}]
-    puts $font
     set r 0
-    foreach {key desc} {
-        ⏎ "run command"
-        Esc quit
-        ↓ "show history"
-        ⭾ "completion (after 3 characters)"
+    foreach row {
+        {⏎ "run command" Alt-d "dictionary"}
+        {Esc quit}
+        {↓ "show history"}
+        {⭾ "completion (after 3 characters)"}
     } {
-        ttk::button .help.key$r -text $key -state disabled;# -font $font
-        label .help.desc$r -text "- $desc." ;#-font $font
-        grid .help.key$r .help.desc$r -sticky w -pady 3
+        set ws [list]
+        set c1 0
+        set c2 1
+        foreach {key desc} $row {
+            ttk::button .help.key$r$c1 -text $key -state disabled;# -font $font
+            label .help.desc$r$c2 -text "- $desc." ;#-font $font
+            lappend ws .help.key$r$c1 .help.desc$r$c2
+            incr c1 2; incr c2 2
+        }
+        grid {*}$ws -sticky w -pady 3
         incr r
     }
-   
+
     grid .l1 .command .browse -sticky e -padx 5 -pady 2
 
     grid .s1 - - -sticky ew -padx 5 -pady 5
@@ -73,6 +83,7 @@ proc main {} {
     bind . <Escape> quit
     bind .command <Tab> [list completion .completionMenu .command]
     bind .command <Key-Return> run
+    bind .command <Alt-d> runDictionary
     bind .command <Key-Down> {
         if {$command ne ""} {
             .completionMenu activate 0
@@ -145,6 +156,18 @@ proc run {} {
         set f [open ~/.run_history a+]
         puts $f $command
         close $f
+    }
+    quit
+}
+
+
+proc runDictionary {} {
+    puts [info level 0]
+    global command term xterm pager dict
+
+    set command [string trim $command]
+    if {$command ne ""} {
+        exec $xterm -e "$dict '$command' | $pager" &
     }
     quit
 }
