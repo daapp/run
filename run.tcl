@@ -212,8 +212,10 @@ proc completion {menuName command} {
         package require fileutil
         set found [list]
         foreach path [split $::env(PATH) :] {
-            foreach file [fileutil::findByPattern $path -glob $text*] {
-                lappend found [lindex [file split $file] end]
+            if {[file isdirectory $path]} {
+                foreach file [fileutil::findByPattern $path -glob $text*] {
+                    lappend found [lindex [file split $file] end]
+                }
             }
         }
         if {[llength $found] > 0} {
