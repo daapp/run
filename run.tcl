@@ -1,11 +1,13 @@
 #! /bin/sh
-# \
+# -*- mode: Tcl; -*- \
 exec tclsh "$0" ${1+"$@"}
 
 # (c) 2017-2021 Alexander Danilov <alexander.a.danilov@gmail.com>
 
 package require Tk
 package require Ttk
+package require msgcat
+namespace import msgcat::mc msgcat::mcset
 
 catch {package require fsdialog}
 
@@ -26,6 +28,15 @@ set term stdout
 set command ""
 
 
+msgcat::mcset ru "run command" "выполнить команду"
+msgcat::mcset ru "dictionary" "словарь"
+msgcat::mcset ru "show history" "показать историю"
+msgcat::mcset ru "completion (after 3 characters)" "дополнение (после 3х знаков)"
+msgcat::mcset ru "exit" "выйти"
+msgcat::mcset ru "Shell command" "Команда оболочки"
+msgcat::mcset ru "Browse" "Обзор"
+
+
 ttk::style configure TButton \
     -background lightblue \
     -foreground black \
@@ -36,12 +47,12 @@ ttk::style map TButton \
     -foreground [list disabled black]
 
 proc main {} {
-    ttk::label .l1 -text "Shell command:"
+    ttk::label .l1 -text [mc "Shell command"]:
     ttk::entry .command \
         -textvariable command \
         -exportselection false
     button .browse \
-        -text Browse \
+        -text [mc Browse] \
         -underline 0 \
         -command {browse .command}
     
@@ -53,7 +64,7 @@ proc main {} {
     set r 0
     foreach row {
         {⏎ "run command" Alt-d "dictionary"}
-        {Esc quit}
+        {Esc exit} 
         {↓ "show history"}
         {⭾ "completion (after 3 characters)"}
     } {
@@ -62,7 +73,7 @@ proc main {} {
         set c2 1
         foreach {key desc} $row {
             ttk::button .help.key$r$c1 -text $key -state disabled;# -font $font
-            label .help.desc$r$c2 -text "- $desc." ;#-font $font
+            label .help.desc$r$c2 -text " - [mc $desc]." ;#-font $font
             lappend ws .help.key$r$c1 .help.desc$r$c2
             incr c1 2; incr c2 2
         }
