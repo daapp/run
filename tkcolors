@@ -1,0 +1,116 @@
+#! /bin/sh
+# \
+exec tclsh "$0" ${1+"$@"}
+
+tcl::tm::path add [file join $env(HOME) lib tcl]
+
+package require Tk
+package require Ttk
+package require widget::scrolledwindow
+package require fileutil
+
+set rgbFile "/etc/X11/rgb.txt"
+set colors [dict create]
+set colorNames [list]
+set colorValues [list]
+array set w {}
+
+proc yset {args} {
+    variable w
+
+    $w(sy) set {*}$args
+    yview moveto [lindex [$w(sy) get] 0]
+}
+
+proc yview {args} {
+    variable w
+
+    $w(names) yview {*}$args
+    $w(values) yview {*}$args
+}
+
+
+
+
+proc main {args} {
+    variable rgbFile
+    variable w
+
+    set sw [ttk::frame .sw]
+    set w(names) [listbox $sw.names \
+                      -listvariable colorNames \
+                      -yscrollcommand yset]
+    set w(values) [listbox $sw.values \
+                       -listvariable colorValues \
+                       -yscrollcommand yset]
+    set w(sy) [scrollbar $sw.sy \
+                   -orient vertical \
+                   -command yview]
+
+    grid $w(names) $w(values) -row 0 -sticky nsew
+    grid $sw.sy -row 0 -column 2 -sticky ns
+    grid rowconfigure $sw 0 -weight 1
+    grid columnconfigure $sw {0 1} -weight 1
+
+    pack $sw -side left -fill both -expand true
+
+    ttk::frame .data
+    ttk::label .data.lname -text "Color name:"
+    set w(name) [ttk::entry .data.ename]
+    ttk::label .data.lvalue -text "Color value (#rgb):"
+    set w(value) [ttk::entry .data.evalue]
+    grid .data.lname .data.ename -sticky ew
+    grid .data.lvalue .data.evalue -sticky ew
+    
+    pack .data -side right -fill both -expand true -padx 20 -pady 20
+    
+    after idle readRGBFile $rgbFile
+
+    bind . <Control-q> {exit 0}
+    bind . <Escape> {exit 0}
+    bind $w(names) <<ListboxSelect>> {showColor %W}
+    bind $w(values) <<ListboxSelect>> {showColor %W}
+}
+
+
+proc readRGBFile {filename} {
+    variable w
+    variable colorNames
+    variable colorValues
+    variable colors
+
+    set _colors [list]
+    fileutil::foreachLine l $filename {
+        if {[regexp {^\s*(\d+)\s+(\d+)\s+(\d+)\s+(.*)$} $l -> r g b name]} {
+            set value [format "#%02x%02x%02x" $r $g $b]
+            lappend _colors [list $name $value]
+            dict set colors $name $value
+        }
+    }
+   
+    set i 0
+    foreach c $_colors {
+        lassign $c n v
+        lappend colorNames $n
+        lappend colorValues "          "
+        $w(values) itemconfigure $i -background $v
+        incr i
+    }
+
+}
+
+proc showColor {l} {
+    variable w
+    variable colors
+
+    set i [$l curselection]
+    if {[string is integer -strict $i]} {
+        set name [$w(names) get $i]
+        $w(name) delete 0 end
+        $w(name) insert end $name
+        $w(value) delete 0 end
+        $w(value) insert end [dict get $colors $name]
+    }
+}
+
+main $argv
