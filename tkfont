@@ -1,0 +1,112 @@
+#! /bin/sh
+# \
+exec tclsh "$0" ${1+"$@"}
+
+# (c) 2022 Alexander Danilov <alexander.a.danilov@gmail.com>
+
+tcl::tm::path add [file join $env(HOME) lib tcl]
+
+package require Tk
+package require Ttk
+
+package require widget::scrolledwindow
+package require widget::scrolledtext
+
+package require tkapp
+namespace import tkapp::w
+
+
+namespace eval tkfont {
+    variable sampleText "1234567890 ABCDEFGHIJKLMNOPQRSTUVWXYZ abcdefghijklmnopqrstuvwxyz АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ абвгдеёжзийклмнопрстуфхцчшщъыьэюя"
+    variable attrs
+    array set attrs {fontsize 12}
+}
+
+proc tkfont::start {args} {
+    variable attrs
+
+    set ns [namespace current]
+    
+    tkapp [w app .tkfont] \
+        -name [option get . title Title] \
+        -application TkFont \
+        -defaultmenu 1 \
+        -aboutcommand ${ns}::showAbout
+
+    set mf [[w app] getframe]
+
+    # font list
+    set familiesSW [widget::scrolledwindow $mf.families]
+    listbox [w families $familiesSW.list] \
+        -selectmode multiple \
+        -selectbackground #2b94d9 \
+        -selectforeground white \
+        -exportselection 0
+    $familiesSW setwidget [w families]
+
+    # show font box
+    set rightSide [ttk::frame $mf.right]
+    set attrFrame [ttk::labelframe $rightSide.attrs -text "Attributes:"]
+    foreach a {bold italic underline overstrike} {
+        set attrs($a) 0
+        ttk::checkbutton $attrFrame.$a \
+            -text [string totitle $a] \
+            -variable ${ns}::attrs($a) \
+            -command ${ns}::redraw
+        pack $attrFrame.$a -side left
+    }
+    ttk::label $attrFrame.fontsizeLabel -text "Font size:"
+    ttk::spinbox $attrFrame.fontsize \
+        -textvariable ${ns}::attrs(fontsize) \
+        -values {6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 24 28 32 36 42 48 64 72} \
+        -command ${ns}::redraw
+    pack $attrFrame.fontsizeLabel -side left -padx {20 0}
+    pack $attrFrame.fontsize -side left
+    
+    set scrolledText [widget::scrolledtext [w sampleText $rightSide.demo] -scrollbar vertical -wrap char]
+
+    pack $attrFrame -side top -fill x
+    pack $scrolledText -side top -fill both -expand true
+
+    pack $familiesSW -side left -fill y
+    pack $rightSide -side right -fill both -expand true
+
+    [w families] insert end {*}[lsort -dictionary -unique [font families]]
+
+    [w sampleText] insert end [set ${ns}::sampleText]
+    
+    wm withdraw .
+    wm iconname [w app] "TkFont"
+
+    bind [w families] <<ListboxSelect>> ${ns}::redraw
+
+    after idle {
+        [w families] activate 0
+        [w families] selection set 0
+        tkfont::redraw
+    }
+}
+
+proc tkfont::redraw {} {
+    variable sampleText
+    variable attrs
+
+    [w sampleText] delete 0.0 end
+
+    foreach font [[w families] curselection] {
+        set family [[w families] get $font]
+        set weight [dict get {0 normal 1 bold} $attrs(bold)]
+        set slant [dict get {0 roman 1 italic} $attrs(italic)]
+        [w sampleText] tag configure tag$font \
+            -font [list -family $family \
+                       -size $attrs(fontsize) \
+                       -overstrike $attrs(overstrike) \
+                       -underline $attrs(underline) \
+                       -weight $weight \
+                       -slant $slant \
+                      ]
+        [w sampleText] insert end "$family\n$sampleText\n\n" tag$font
+    }
+}
+
+tkfont::start
