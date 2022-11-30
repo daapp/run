@@ -15,20 +15,6 @@ set colorNames [list]
 set colorValues [list]
 array set w {}
 
-proc yset {args} {
-    variable w
-
-    $w(sy) set {*}$args
-    yview moveto [lindex [$w(sy) get] 0]
-}
-
-proc yview {args} {
-    variable w
-
-    $w(names) yview {*}$args
-    $w(values) yview {*}$args
-}
-
 
 
 
@@ -111,6 +97,20 @@ proc showColor {l} {
         $w(value) delete 0 end
         $w(value) insert end [dict get $colors $name]
     }
+}
+
+proc yset {args} {
+    variable w
+
+    $w(sy) set {*}$args
+    yview moveto [lindex [$w(sy) get] 0]
+}
+
+proc yview {args} {
+    variable w
+
+    $w(names) yview {*}$args
+    $w(values) yview {*}$args
 }
 
 main $argv
