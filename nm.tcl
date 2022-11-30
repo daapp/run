@@ -13,10 +13,16 @@ namespace import msgcat::mc msgcat::mcset
 
 
 set program "Network manager"
-set version 0.1
+set version 0.2
 set title "$program $version"
 
 set maxLogLines 10
+
+array set typeMap {
+    802-11-wireless wifi
+    802-3-ethernet  eth
+    bluetooth       bt
+}
 
 namespace eval nm {
     # path to network-manager CLI 
@@ -33,10 +39,10 @@ namespace eval nm {
     proc connections {} {
         variable nmcli
 
-        set conns [dict create]
-        foreach l [split [nmcli --colors=no -t -e yes -f name,active,type c] \n] {
-            lassign [split $l :] name active type
-            dict set conns $name [list active $active type $type]
+        set conns [list]
+        foreach l [split [nmcli --colors=no -t -e yes -f name,active,type,uuid c] \n] {
+            lassign [split $l :] name active type uuid
+            lappend conns [list name $name active $active type $type uuid $uuid]
         }
         return $conns
     }
@@ -113,17 +119,26 @@ proc main {args} {
 proc showConnections {} {
     variable w
     variable conns
+    variable typeMap
 
     set index [$w(networks) index active]
     $w(networks) delete 0 end
     set conns [nm::connections]
-    foreach name [lsort [dict keys $conns]] {
-        $w(networks) insert end "$name / [dict get $conns $name type]"
+    set nameWidth [lmap c $conns {string length [dict get $c name]}]
+
+    foreach conn $conns {
+        if {[info exists typeMap([dict get $conn type])]} {
+            set type $typeMap([dict get $conn type])
+        } else {
+            set type [dict get $conn type]
+        }
+        $w(networks) insert end [format "%4s / %s" $type [dict get $conn name]]
         $w(networks) itemconfigure end \
-            -foreground [expr {[dict get $conns $name active] eq "yes" ? "green" : "red"}]
+            -foreground [expr {[dict get $conn active] eq "yes" ? "green" : "red"}]
     }
     $w(networks) activate $index
     $w(networks) selection anchor $index
+    $w(networks) selection set $index
 }
 
 
@@ -151,15 +166,15 @@ proc log {s} {
     }
 }
 
+
 proc toggleNetwork {} {
     variable conns
     variable w
 
-    set name [string trim [lindex [split [$w(networks) get [$w(networks) curselect]] /] 0]]
-    
-    set command [expr {[dict get $conns $name active] eq "yes" ? "down" : "up"}]
+    set conn [lindex $conns [$w(networks) curselection]]
+    set command [expr {[dict get $conn active] eq "yes" ? "down" : "up"}]
 
-    log [nm::nmcli c $command $name]
+    log [nm::nmcli c $command [dict get $conn uuid]]
     showConnections
 }
 
