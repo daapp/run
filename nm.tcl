@@ -99,6 +99,7 @@ proc main {args} {
     after idle showConnections
 
     bind $w(networks) <Return> toggleNetwork
+    bind $w(networks) <Double-Button-1> toggleNetwork
     bind . <Map> {
         wm geometry . [winfo reqwidth .]x[winfo reqheight .]
         focus $w(networks) 
