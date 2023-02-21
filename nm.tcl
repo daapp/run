@@ -13,7 +13,7 @@ namespace import msgcat::mc msgcat::mcset
 
 
 set program "Network manager"
-set version 0.2
+set version 0.3
 set title "$program $version"
 
 set maxLogLines 10
@@ -22,16 +22,46 @@ array set typeMap {
     802-11-wireless wifi
     802-3-ethernet  eth
     bluetooth       bt
+    loopback        lo
 }
 
+set confFile [file join $env(HOME) .[file tail $argv0].conf]
+array set conf {}
+
+namespace eval conf {
+    proc load {fileName} {
+        set r {}
+        if {[catch {
+            set f [open $fileName r]
+            set r [dict create {*}[read $f]]
+            close $f
+        } errorMessage]} {
+            puts stderr $errorMessage
+            return {}
+        } else {
+            return $r
+        }
+    }
+
+    # newConf - is a dict
+    proc save {fileName newConf} {
+        set f [open $fileName w]
+        dict for {k v} $newConf {
+            puts $f "$k $v"
+        }
+        close $f
+    }
+}
+
+
 namespace eval nm {
-    # path to network-manager CLI 
+    # path to network-manager CLI
     variable nmcli "nmcli"
     variable monitorChannel ""
 
     proc nmcli {args} {
         variable nmcli
-        
+
         exec $nmcli {*}$args
     }
 
@@ -47,6 +77,7 @@ namespace eval nm {
         return $conns
     }
 
+
     # command should accept 1 argument - file handle
     proc monitor {{command ""}} {
         variable nmcli
@@ -57,7 +88,7 @@ namespace eval nm {
             chan configure $monitorChannel -blocking 0 -buffering line
             chan event $monitorChannel readable [list $command $monitorChannel]
         } else {
-            
+
             if {[catch {exec kill [pid $monitorChannel]} e]} {
                 puts stderr $e
             }
@@ -72,6 +103,10 @@ set conns [dict create]
 
 proc main {args} {
     variable w
+    variable conf
+    variable confFile
+
+    array set conf [conf::load $confFile]
 
     set title [ttk::frame .title]
     ttk::label $title.text -text "$::program $::version" -anchor center
@@ -80,6 +115,8 @@ proc main {args} {
     set sl [widget::scrolledwindow .sl -scrollbar vertical]
     set w(networks) [listbox $sl. -font TkFixedFont]
     $sl setwidget $w(networks)
+
+    set w(types) [ttk::frame .types -relief raised]
 
     set sw [widget::scrolledwindow .sw -scrollbar vertical]
     set w(log) [text $sw.nmLog -wrap word -height 5 -width 40]
@@ -92,19 +129,32 @@ proc main {args} {
     pack $buttons.exit -side right
 
     pack $title -side top -fill x
+    pack $w(types) -side top -fill x -padx 10 -pady 10
     pack $sl -side top -fill both -expand true -padx 10 -pady 10
     pack $buttons -side bottom -fill x -padx 10 -pady 10
     pack $sw -side bottom -fill x -padx 10 -pady 10
-    
+
     after idle showConnections
 
     bind $w(networks) <Return> toggleNetwork
     bind $w(networks) <Double-Button-1> toggleNetwork
-    bind . <Map> {
-        wm geometry . [winfo reqwidth .]x[winfo reqheight .]
-        focus $w(networks) 
+    bind $w(networks) <Home> [bind Listbox <Control-Home>]
+    bind $w(networks) <End> [bind Listbox <Control-End>]
 
-    }
+    bind . <Map> [list apply {{} {
+        global w
+        set rw [winfo reqwidth .]
+        set rh [winfo reqheight .]
+        if {$rw > $rh} {
+            set rh [expr {int($rw / 1.33)}]
+        } else {
+            set rw [expr {int($rh / 1.33)}]
+        }
+
+        wm geometry . ${rw}x${rh}
+        focus $w(networks)
+    }}]
+
     bind . <Control-q> quit
     bind . <Escape> quit
 
@@ -121,22 +171,57 @@ proc showConnections {} {
     variable w
     variable conns
     variable typeMap
+    variable conf
 
     set index [$w(networks) index active]
     $w(networks) delete 0 end
     set conns [nm::connections]
     set nameWidth [lmap c $conns {string length [dict get $c name]}]
 
+    set types {}
     foreach conn $conns {
         if {[info exists typeMap([dict get $conn type])]} {
             set type $typeMap([dict get $conn type])
         } else {
             set type [dict get $conn type]
         }
-        $w(networks) insert end [format "%4s / %s" $type [dict get $conn name]]
-        $w(networks) itemconfigure end \
-            -foreground [expr {[dict get $conn active] eq "yes" ? "green" : "red"}]
+
+        lappend types $type
+
+        if {![info exists conf($type)]} {
+            set conf($type) show
+        }
+
+        if {$conf($type) ne "hide"} {
+            $w(networks) insert end [format "%4s / %s" $type [dict get $conn name]]
+            $w(networks) itemconfigure end \
+                -foreground [expr {[dict get $conn active] eq "yes" ? "green" : "red"}]
+        }
     }
+
+    # hide unexistent types
+    foreach cb [winfo children $w(types)] {
+        if {[lindex [split $cb .] end] in $types} {
+            pack $cb
+        } else {
+            pack forget $cb
+        }
+    }
+    foreach t [lsort $types] {
+        if {[winfo exists $w(types).$t]} {
+
+        } else {
+            ttk::checkbutton $w(types).$t \
+                -offvalue hide \
+                -onvalue show \
+                -style Toolbutton \
+                -variable conf($t) \
+                -command {after idle showConnections} \
+                -text $t
+            pack $w(types).$t -side left -padx 5 -pady 5
+        }
+    }
+
     $w(networks) activate $index
     $w(networks) selection anchor $index
     $w(networks) selection set $index
@@ -181,6 +266,11 @@ proc toggleNetwork {} {
 
 
 proc quit {} {
+    variable conf
+    variable confFile
+
+    conf::save $confFile [array get conf]
+
     nm::monitor
 
     exit 0
