@@ -11,8 +11,8 @@ namespace import msgcat::mc msgcat::mcset
 
 catch {package require fsdialog}
 
-set xterm xterm
-set pager less
+
+set pager tkpager
 set dict dict
 
 # minimal number of characters for completion
@@ -55,7 +55,7 @@ proc main {} {
         -text [mc Browse] \
         -underline 0 \
         -command {browse .command}
-    
+
     ttk::separator .s1 -orient horizontal
 
     ttk::frame .help
@@ -64,7 +64,7 @@ proc main {} {
     set r 0
     foreach row {
         {⏎ "run command" Alt-d "dictionary"}
-        {Esc exit} 
+        {Esc exit}
         {↓ "show history"}
         {⭾ "completion (after 3 characters)"}
     } {
@@ -152,7 +152,7 @@ proc browse {command} {
         $command insert insert $name
     }
     focus $command
-    $command xview end 
+    $command xview end
 }
 
 #
@@ -173,12 +173,11 @@ proc run {} {
 
 
 proc runDictionary {} {
-    puts [info level 0]
-    global command term xterm pager dict
+    global command term pager dict
 
-    set command [string trim $command]
-    if {$command ne ""} {
-        exec $xterm -e "$dict '$command' | $pager" &
+    set word [string trim $command]
+    if {$word ne ""} {
+        exec $::env(SHELL) -c "$dict '$word' | $pager" &
     }
     quit
 }
