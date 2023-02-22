@@ -257,10 +257,20 @@ proc toggleNetwork {} {
     variable conns
     variable w
 
-    set conn [lindex $conns [$w(networks) curselection]]
-    set command [expr {[dict get $conn active] eq "yes" ? "down" : "up"}]
+    set connName [lindex [split [$w(networks) get [$w(networks) curselection]] " / "] end]
 
-    log [nm::nmcli c $command [dict get $conn uuid]]
+    set active ""
+    set uuid ""
+    foreach c $conns {
+        if {[dict get $c name] eq $connName} {
+            set active [dict get $c active]
+            set uuid [dict get $c uuid]
+            break
+        }
+    }
+    set command [expr {$active eq "yes" ? "down" : "up"}]
+
+    log [nm::nmcli c $command $uuid]
     showConnections
 }
 
