@@ -194,8 +194,8 @@ proc showConnections {} {
 
         if {$conf($type) ne "hide"} {
             $w(networks) insert end [format "%4s / %s" $type [dict get $conn name]]
-            $w(networks) itemconfigure end \
-                -foreground [expr {[dict get $conn active] eq "yes" ? "green" : "red"}]
+            set color [expr {[dict get $conn active] eq "yes" ? "green" : "red"}]
+            $w(networks) itemconfigure end -foreground $color -selectforeground $color
         }
     }
 
