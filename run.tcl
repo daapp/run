@@ -12,8 +12,14 @@ namespace import msgcat::mc msgcat::mcset
 catch {package require fsdialog}
 
 
-set pager tkpager
-set dict dict
+array set config [list dir [file join $env(HOME) .config run]]
+array set config {
+    pager tkpager
+    dict dict
+    term stdout
+}
+set config(userCommandFile) [file join $config(dir) user_commands]
+set config(userCommands)    [list [list Alt-d "dictionary" "$config(dict) '%s'"]]
 
 # minimal number of characters for completion
 set minCompletionSize 3
@@ -24,7 +30,6 @@ set historySize 20
 # Maximum menu size
 set completionMenuSize 30
 
-set term stdout
 set command ""
 
 
@@ -47,6 +52,10 @@ ttk::style map TButton \
     -foreground [list disabled black]
 
 proc main {} {
+    variable config
+
+    file mkdir $config(dir)
+
     ttk::label .l1 -text [mc "Shell command"]:
     ttk::entry .command \
         -textvariable command \
@@ -63,10 +72,8 @@ proc main {} {
     dict set font -size [expr {int([dict get $font -size] * 0.8)}]
     set r 0
     foreach row {
-        {⏎ "run command" Alt-d "dictionary"}
-        {Esc exit}
-        {↓ "show history"}
-        {⭾ "completion (after 3 characters)"}
+        {⏎ "run command" Esc exit}
+        {↓ "show history" ⭾ "completion (after 3 characters)"}
     } {
         set ws [list]
         set c1 0
@@ -79,6 +86,40 @@ proc main {} {
         }
         grid {*}$ws -sticky w -pady 3
         incr r
+    }
+    lappend config(userCommands) {*}[readUserCommands $config(userCommandFile)]
+    if {$config(userCommands) ne ""} {
+        frame .help.sep1 -height 2 -relief ridge -bd 1
+        grid .help.sep1 - - - - -sticky ew -pady 10
+        set i 0
+        set table [list]
+        set ws [list]
+        foreach cmd $config(userCommands) {
+            lassign $cmd binding description userCommand
+            ttk::button .help.ukey$i -text $binding -state disabled
+            label .help.udesc$i -text " - [mc $description]."
+            switch -- [llength $ws] {
+                0 {
+                    lappend ws .help.ukey$i .help.udesc$i
+                }
+                2 {
+                    lappend ws .help.ukey$i .help.udesc$i
+                    lappend table $ws
+                    set ws [list]
+                }
+                default {
+                    set table [list]
+                }
+            }
+            incr i
+            bind .command <$binding> [list runUserCommand [string map {% %%} $userCommand]]
+        }
+        if {[llength $ws] != 0} {
+            lappend table $ws
+        }
+        foreach row $table {
+            grid {*}$row -sticky w -pady 3
+        }
     }
 
     grid .l1 .command .browse -sticky e -padx 5 -pady 2
@@ -93,8 +134,8 @@ proc main {} {
 
     bind . <Escape> quit
     bind .command <Tab> [list completion .completionMenu .command]
-    bind .command <Key-Return> run
-    bind .command <Alt-d> runDictionary
+    bind .command <Key-Return> {run history}
+    #bind .command <Alt-d> runDictionary
     bind .command <Key-Down> {
         if {$command ne ""} {
             .completionMenu activate 0
@@ -155,16 +196,36 @@ proc browse {command} {
     $command xview end
 }
 
+
+# read file in format:
+#   binding description command
+proc readUserCommands {fileName} {
+    variable config
+
+    set userCommands [list]
+    if {![catch {set f [open [file join $fileName] r]} e]} {
+        while {![chan eof $f]} {
+            set s [string trim [chan gets $f]]
+            if {$s ne ""} {
+                lappend userCommands $s
+            }
+        }
+        chan close $f
+    }
+    return $userCommands
+}
+
 #
 # Runs desired command and records it in the history file
 #
-proc run {} {
-    global command term
+proc run {name} {
+    variable command
+    variable config
 
     set command [string trim $command]
     if {$command ne ""} {
-        exec /bin/sh -c $command >/dev/$term </dev/$term 2>/dev/$term &
-        set f [open ~/.run_history a+]
+        exec /bin/sh -c $command >/dev/$config(term) </dev/$config(term) 2>/dev/$config(term) &
+        set f [open [file join $config(dir) .run_$name] a+]
         puts $f $command
         close $f
     }
@@ -172,21 +233,22 @@ proc run {} {
 }
 
 
-proc runDictionary {} {
-    global command term pager dict
+proc runUserCommand {userCommand} {
+    variable command
+    variable config
 
     set word [string trim $command]
     if {$word ne ""} {
-        exec $::env(SHELL) -c "$dict '$word' | $pager" &
+        exec $::env(SHELL) -c [format "$userCommand | $config(pager)" $word] &
     }
     quit
 }
 
 
 proc readMenu {menu name defaultValues} {
-    global historySize
+    variable historySize config
 
-    if {[catch {open ~/.run_$name} f]} {
+    if {[catch {open [file join $config(dir) .run_$name] r} f]} {
         foreach v $defaultValues {
             $menu add command -label $v -command [list set command $v]
         }
@@ -200,7 +262,7 @@ proc readMenu {menu name defaultValues} {
         close $f
         if {[llength $list] > $historySize} {
             set list [lreplace $list $historySize end]
-            set f [open ~/.run_$name w]
+            set f [open [file join $config(dir) .run_$name] w]
             foreach h [lrange $list 0 $historySize] {
                 puts $f $h
             }
