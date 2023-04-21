@@ -122,7 +122,8 @@ proc main {} {
         }
     }
 
-    grid .l1 .command .browse -sticky e -padx 5 -pady 2
+    grid .l1 x .browse -sticky e -padx 5 -pady 2
+    grid .command -row 0 -column 1 -sticky ew -padx 5 -pady 2
 
     grid .s1 - - -sticky ew -padx 5 -pady 5
     grid .help - - -sticky we -padx 5 -pady 5
@@ -135,7 +136,6 @@ proc main {} {
     bind . <Escape> quit
     bind .command <Tab> [list completion .completionMenu .command]
     bind .command <Key-Return> {run history}
-    #bind .command <Alt-d> runDictionary
     bind .command <Key-Down> {
         if {$command ne ""} {
             .completionMenu activate 0
