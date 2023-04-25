@@ -201,12 +201,13 @@ proc quit {} {
 proc readSettings {} {
     variable config
 
-    set f [open $config(settingsFile) r]
-    foreach k $config(saveSettings) {
-        set s [chan gets $f]
-        set config([lindex $s 0]) [lrange $s 1 end]
+    if {![catch {set f [open $config(settingsFile) r]}]} {
+        foreach k $config(saveSettings) {
+            set s [chan gets $f]
+            set config([lindex $s 0]) [lrange $s 1 end]
+        }
+        chan close $f
     }
-    chan close $f
 }
 
 #
@@ -342,7 +343,7 @@ proc centerWindow {w} {
     wm withdraw $w
     update idletasks
     set x [expr {[winfo screenwidth $w]/2 -
-                 [winfo reqwidth $w]/2 \ -
+                 [winfo reqwidth $w]/2 -
                  [winfo vrootx [winfo parent $w]]
              }]
     set y [expr {[winfo screenheight $w]/2 -
