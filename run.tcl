@@ -13,22 +13,24 @@ catch {package require fsdialog}
 
 
 array set config [list dir [file join $env(HOME) .config run]]
+set config(historyFile) [file join $config(dir) history]
+set config(settingsFile) [file join $config(dir) settings]
 array set config {
     pager tkpager
     dict dict
     term stdout
+    minCompletionSize 3
+    historySize 20
+    completionMenuSize 30
+    saveSettings {pager minCompletionSize historySize}
 }
+
 set config(userCommandFile) [file join $config(dir) user_commands]
 set config(userCommands)    [list [list Alt-d "dictionary" "$config(dict) '%s'"]]
 
 # minimal number of characters for completion
-set minCompletionSize 3
-
 # Maximum size of history file
-set historySize 20
-
 # Maximum menu size
-set completionMenuSize 30
 
 set command ""
 
@@ -51,19 +53,22 @@ ttk::style map TButton \
     -background [list active lightblue] \
     -foreground [list disabled black]
 
+
 proc main {} {
     variable config
 
     file mkdir $config(dir)
+    readSettings
 
-    ttk::label .l1 -text [mc "Shell command"]:
-    ttk::entry .command \
-        -textvariable command \
-        -exportselection false
-    button .browse \
-        -text [mc Browse] \
-        -underline 0 \
-        -command {browse .command}
+    set f [frame .input]
+    ttk::label $f.l1 -text [mc "Shell command"]:
+    set wCommand [ttk::entry $f.command \
+                        -textvariable command \
+                        -exportselection false]
+    button $f.browse \
+        -text [mc 🗀] \
+        -command [list browse $wCommand]
+    button $f.settings -text [mc ⚙] -command [list showSettings]
 
     ttk::separator .s1 -orient horizontal
 
@@ -112,7 +117,7 @@ proc main {} {
                 }
             }
             incr i
-            bind .command <$binding> [list runUserCommand [string map {% %%} $userCommand]]
+            bind $wCommand <$binding> [list runUserCommand [string map {% %%} $userCommand]]
         }
         if {[llength $ws] != 0} {
             lappend table $ws
@@ -122,43 +127,45 @@ proc main {} {
         }
     }
 
-    grid .l1 x .browse -sticky e -padx 5 -pady 2
-    grid .command -row 0 -column 1 -sticky ew -padx 5 -pady 2
+    pack $f.l1 -side left
+    pack $f.command -side left -fill x -expand true
+    pack $f.browse $f.settings -side left -padx 5 -pady 2
 
+    grid $f -sticky ew -padx 5 -pady 5
     grid .s1 - - -sticky ew -padx 5 -pady 5
     grid .help - - -sticky we -padx 5 -pady 5
-    grid columnconfigure . .command -weight 2
+    grid columnconfigure . $f -weight 2
 
     menu .historyMenu -tearoff 0
     menu .completionMenu -tearoff 0
-    readMenu .historyMenu history [list]
+    readMenu .historyMenu
 
     bind . <Escape> quit
-    bind .command <Tab> [list completion .completionMenu .command]
-    bind .command <Key-Return> {run history}
-    bind .command <Key-Down> {
+    bind $wCommand <Tab> [list completion .completionMenu $wCommand]
+    bind $wCommand <Key-Return> {run history}
+    bind $wCommand <Key-Down> {
         if {$command ne ""} {
             .completionMenu activate 0
             after idle focus .completionMenu
         } else {
-            .historyMenu post [winfo rootx .command] [expr {[winfo rooty .command] + [winfo height .command]}]
+            .historyMenu post [winfo rootx $wCommand] [expr {[winfo rooty $wCommand] + [winfo height $wCommand]}]
             after idle focus .historyMenu
         }
     }
     bind .historyMenu <Unmap> {
         after idle {
-            focus -force .command
-            .command icursor end
+            focus -force $wCommand
+            $wCommand icursor end
         }
     }
     bind .completionMenu <Escape> {
         %W unpost
-        after idle {focus -force .command}
+        after idle {focus -force $wCommand}
     }
     bind .completionMenu <Unmap> {
         after idle {
-            focus -force .command
-            .command icursor end
+            focus -force $wCommand
+            $wCommand icursor end
         }
     }
     bind . <Map> {wm geometry . [winfo reqwidth .]x[winfo reqheight .]}
@@ -169,13 +176,37 @@ proc main {} {
     wm resizable . 0 0
 
     tk app Run
-    focus -force .command
+    focus -force $wCommand
+}
+
+
+proc saveSettings {} {
+    variable config
+
+    set f [open $config(settingsFile) w]
+    foreach {k} $config(saveSettings) {
+        chan puts $f "$k $config($k)"
+    }
+    chan close $f
 }
 
 
 proc quit {} {
+
     destroy .
     exit 0
+}
+
+
+proc readSettings {} {
+    variable config
+
+    set f [open $config(settingsFile) r]
+    foreach k $config(saveSettings) {
+        set s [chan gets $f]
+        set config([lindex $s 0]) [lrange $s 1 end]
+    }
+    chan close $f
 }
 
 #
@@ -196,14 +227,13 @@ proc browse {command} {
     $command xview end
 }
 
-
 # read file in format:
 #   binding description command
 proc readUserCommands {fileName} {
     variable config
 
     set userCommands [list]
-    if {![catch {set f [open [file join $fileName] r]} e]} {
+    if {![catch {set f [open $fileName r]} e]} {
         while {![chan eof $f]} {
             set s [string trim [chan gets $f]]
             if {$s ne ""} {
@@ -225,7 +255,7 @@ proc run {name} {
     set command [string trim $command]
     if {$command ne ""} {
         exec /bin/sh -c $command >/dev/$config(term) </dev/$config(term) 2>/dev/$config(term) &
-        set f [open [file join $config(dir) .run_$name] a+]
+        set f [open $config(historyFile) a+]
         puts $f $command
         close $f
     }
@@ -245,14 +275,10 @@ proc runUserCommand {userCommand} {
 }
 
 
-proc readMenu {menu name defaultValues} {
-    variable historySize config
+proc readMenu {menu} {
+    variable config
 
-    if {[catch {open [file join $config(dir) .run_$name] r} f]} {
-        foreach v $defaultValues {
-            $menu add command -label $v -command [list set command $v]
-        }
-    } else {
+    if {![catch {open $config(historyFile) r} f]} {
         set list {}
         while {![eof $f]} {
             set entry [gets $f]
@@ -260,10 +286,10 @@ proc readMenu {menu name defaultValues} {
             set list [linsert $list 0 $entry]
         }
         close $f
-        if {[llength $list] > $historySize} {
-            set list [lreplace $list $historySize end]
-            set f [open [file join $config(dir) .run_$name] w]
-            foreach h [lrange $list 0 $historySize] {
+        if {[llength $list] > $config(historySize)} {
+            set list [lreplace $list $config(historySize) end]
+            set f [open $config(historyFile) w]
+            foreach h [lrange $list 0 $config(historySize)] {
                 puts $f $h
             }
             close $f
@@ -276,10 +302,10 @@ proc readMenu {menu name defaultValues} {
 
 
 proc completion {menuName command} {
-    global minCompletionSize
+    variable config
 
     set text [$command get]
-    if {[string length $text] >= $minCompletionSize} {
+    if {[string length $text] >= $config(minCompletionSize)} {
         $menuName delete 0 end
         package require fileutil
         set found [list]
@@ -295,11 +321,11 @@ proc completion {menuName command} {
                 set ::command [lindex $found 0]
                 $command icursor end
             } else {
-                foreach file [lrange $found 0 [expr {$::completionMenuSize - 1}]] {
+                foreach file [lrange $found 0 [expr {$config(completionMenuSize) - 1}]] {
                     $menuName add command -label $file -command [list set command $file]
                 }
-                if {[llength $found] > $::completionMenuSize} {
-                    $menuName add command -label "[expr {[llength $found] - $::completionMenuSizey}] command(s) hidden ..."
+                if {[llength $found] > $config(completionMenuSize)} {
+                    $menuName add command -label "[expr {[llength $found] - $config(completionMenuSize)}] command(s) hidden ..."
                 }
                 $menuName post [winfo rootx $command] [expr {[winfo rooty $command] + [winfo height $command]}]
                 $menuName activate 0
@@ -310,5 +336,57 @@ proc completion {menuName command} {
     # stop focus to next widget
     return -code break
 }
+
+
+proc centerWindow {w} {
+    wm withdraw $w
+    update idletasks
+    set x [expr {[winfo screenwidth $w]/2 -
+                 [winfo reqwidth $w]/2 \ -
+                 [winfo vrootx [winfo parent $w]]
+             }]
+    set y [expr {[winfo screenheight $w]/2 -
+                 [winfo reqheight $w]/2 -
+                 [winfo vrooty [winfo parent $w]]
+             }]
+    wm geom $w +$x+$y
+    wm deiconify $w
+}
+
+
+proc showSettings {} {
+    set w [toplevel .settings]
+
+    set f [frame $w.data]
+    ttk::label $f.lpager -text [mc "Pager"]:
+    ttk::entry $f.pager -textvariable config(pager)
+    ttk::label $f.lMinCompletionSize -text [mc "Minimal characters for completion"]:
+    ttk::spinbox $f.minCompletionSize -from 3 -to 10 -textvariable config(minCompletionSize)
+    ttk::label $f.lHistorySize -text [mc "History size"]:
+    ttk::spinbox $f.historySize -from 3 -to 40 -textvariable config(historySize)
+    grid $f.lpager $f.pager -sticky ew -padx 5 -pady 5
+    grid $f.lMinCompletionSize $f.minCompletionSize -sticky ew -padx 5 -pady 5
+    grid $f.lHistorySize $f.historySize -sticky ew -padx 5 -pady 5
+
+    frame $w.sep1 -height 2 -relief ridge -bd 1
+
+    frame $w.buttons
+    button $w.buttons.save -text [mc Save] -command saveSettings
+    button $w.buttons.close -text [mc Close] -command [list destroy $w]
+    pack $w.buttons.close $w.buttons.save -side right -padx 5
+
+    pack $w.data -side top -fill both -expand true -padx 5 -pady 5
+    pack $w.sep1 -side top -fill x -padx 5 -pady 5
+    pack $w.buttons -side bottom -fill x -pady 5
+
+    bind $w <Escape> [list destroy $w]
+
+    wm title $w [mc "Settings"]
+    wm resizable $w 0 0
+    wm minsize $w
+
+    centerWindow $w
+}
+
 
 main
