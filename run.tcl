@@ -38,7 +38,7 @@ set command ""
 msgcat::mcset ru "run command" "выполнить команду"
 msgcat::mcset ru "dictionary" "словарь"
 msgcat::mcset ru "show history" "показать историю"
-msgcat::mcset ru "completion (after 3 characters)" "дополнение (после 3х знаков)"
+msgcat::mcset ru "completion (after %d characters)" "дополнение (после %d знаков)"
 msgcat::mcset ru "exit" "выйти"
 msgcat::mcset ru "Shell command" "Команда оболочки"
 msgcat::mcset ru "Browse" "Обзор"
@@ -76,16 +76,15 @@ proc main {} {
     set font [font configure TkDefaultFont]
     dict set font -size [expr {int([dict get $font -size] * 0.8)}]
     set r 0
-    foreach row {
-        {⏎ "run command" Esc exit}
-        {↓ "show history" ⭾ "completion (after 3 characters)"}
-    } {
+    foreach row [list \
+		     [list ⏎ [mc "run command"] Esc [mc exit]] \
+		     [list ↓ [mc "show history"] ⭾ [mc "completion (after %d characters)" $config(minCompletionSize)]]] {
         set ws [list]
         set c1 0
         set c2 1
         foreach {key desc} $row {
             ttk::button .help.key$r$c1 -text $key -state disabled;# -font $font
-            label .help.desc$r$c2 -text " - [mc $desc]." ;#-font $font
+            label .help.desc$r$c2 -text " - $desc." ;#-font $font
             lappend ws .help.key$r$c1 .help.desc$r$c2
             incr c1 2; incr c2 2
         }
