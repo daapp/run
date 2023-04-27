@@ -6,9 +6,18 @@ package require Tk
 package require Ttk
 package require msgcat
 
+package require inifile
+
 namespace import msgcat::mc msgcat::mcset
 
+
+array set config {}
+set config(dir) [file join $env(HOME) .config tkpager]
+set config(settingsFile) [file join $config(dir) settings]
+
+
 msgcat::mcset ru "exit" "выйти"
+
 
 ttk::style configure TButton \
     -background lightblue \
@@ -20,15 +29,16 @@ ttk::style map TButton \
     -foreground [list disabled black]
 
 
-set text ""
-
 proc main {args} {
-    variable text
-    
+    variable config
+
+    readSettings
+
     set f [ttk::frame .statusbar]
-    ttk::button $f.exit -text "Esc" -state disabled
-    ttk::label $f.exitLabel -text " - [mc exit]"
-    pack $f.exit $f.exitLabel -side left -fill x
+    ttk::label $f.keys -text [mc "Esc - exit"]
+    ttk::button $f.exit -text "Exit" -command quit
+    pack $f.keys -side left
+    pack $f.exit -side right
 
     pack $f -fill x -side bottom -pady 5 -padx 5
 
@@ -36,8 +46,13 @@ proc main {args} {
     set text [text $f.text -font TkFixedFont \
                   -xscrollcommand [list $f.sx set] \
                   -yscrollcommand [list $f.sy set]]
-    ttk::scrollbar $f.sx -orient horizontal -command [list $f.text xset]
-    ttk::scrollbar $f.sy -orient vertical -command [list $f.text yset]
+    if {[info exists config(font,size)]} {
+	set font [font actual [$text cget -font]]
+	dict set font -size $config(font,size)
+	$text configure -font $font
+    }
+    ttk::scrollbar $f.sx -orient horizontal -command [list $f.text xview]
+    ttk::scrollbar $f.sy -orient vertical -command [list $f.text yview]
 
     grid $f.text -sticky nsew
     grid $f.sy -row 0 -column 1 -sticky nsew
@@ -49,7 +64,7 @@ proc main {args} {
 
     wm title . tkpager
 
-    bind . <Escape> exit
+    bind . <Escape> quit
     bind $text <Escape> continue
     bind $text <KeyPress> break
     bind $text <Key-minus> [list changeFontSize %W -1]
@@ -57,18 +72,17 @@ proc main {args} {
 
     after idle focus $text
 
-    after 1 prepare
+    after 1 prepare $text
 }
 
 
-proc prepare {} {
+proc prepare {text} {
     chan configure stdin -buffering line -blocking 0
-    chan event stdin readable readData
+    chan event stdin readable [list readData $text]
 }
 
 
-proc readData {} {
-    variable text
+proc readData {text} {
     gets stdin s
     if {[chan eof stdin]} {
         chan close stdin
@@ -79,12 +93,53 @@ proc readData {} {
     $text mark set insert $insert
 }
 
+
 proc changeFontSize {w val} {
+    variable config
+
     set font [font actual [$w cget -font]]
     dict incr font -size $val
     $w configure -font $font
+
+    set config(font,size) [dict get $font -size]
+
     return -code break
 }
 
+
+proc readSettings {} {
+    variable config
+
+    file mkdir $config(dir)
+    if {[file exists $config(settingsFile)]} {
+	set ini [ini::open $config(settingsFile)]
+	catch {
+	    set fontSize [ini::value $ini font size ""]
+	    if {$fontSize ne ""} {
+		set config(font,size) $fontSize
+	    }
+	}
+	ini::close $ini
+    }
+    return
+}
+
+
+proc saveSettings {} {
+    variable config
+ 
+    if {[info exists config(font,size)]} {
+	set ini [ini::open $config(settingsFile) w]
+	ini::set $ini font size $config(font,size)
+	ini::commit $ini
+	ini::close $ini
+    }
+}
+
+
+proc quit {} {
+    saveSettings
+    exit
+}
 
 main {*}$argv
