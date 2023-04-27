@@ -47,8 +47,8 @@ msgcat::mcset ru "Browse" "Обзор"
 ttk::style configure TButton \
     -background lightblue \
     -foreground black \
-    -padding {0 7} \
-    -width -4
+    -padding {7 7} \
+    -width -5
 ttk::style map TButton \
     -background [list active lightblue] \
     -foreground [list disabled black]
