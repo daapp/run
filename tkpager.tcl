@@ -1,5 +1,5 @@
 #! /bin/sh
-# \
+# -*- mode: Tcl; -*- \
 exec tclsh "$0" ${1+"$@"}
 
 package require Tk
@@ -8,6 +8,7 @@ package require msgcat
 
 namespace import msgcat::mc msgcat::mcset
 
+msgcat::mcset ru "exit" "выйти"
 
 ttk::style configure TButton \
     -background lightblue \
@@ -24,8 +25,14 @@ set text ""
 proc main {args} {
     variable text
     
-    set f [ttk::frame .output]
+    set f [ttk::frame .statusbar]
+    ttk::button $f.exit -text "Esc" -state disabled
+    ttk::label $f.exitLabel -text " - [mc exit]"
+    pack $f.exit $f.exitLabel -side left -fill x
 
+    pack $f -fill x -side bottom -pady 5 -padx 5
+
+    set f [ttk::frame .output]
     set text [text $f.text -font TkFixedFont \
                   -xscrollcommand [list $f.sx set] \
                   -yscrollcommand [list $f.sy set]]
@@ -40,18 +47,13 @@ proc main {args} {
 
     pack $f -fill both -expand true -side top
 
-
-    set f [ttk::frame .statusbar]
-    ttk::button $f.exit -text "Esc" -state disabled
-    ttk::label $f.exitLabel -text " - [mc exit]"
-    pack $f.exit $f.exitLabel -side left -fill x
-    
-    pack $f -fill x -side bottom -pady 5 -padx 5
-
     wm title . tkpager
 
     bind . <Escape> exit
-    #bind $text <<Insert>> break
+    bind $text <Escape> continue
+    bind $text <KeyPress> break
+    bind $text <Key-minus> [list changeFontSize %W -1]
+    bind $text <Key-equal> [list changeFontSize %W 1]
 
     after idle focus $text
 
@@ -75,6 +77,13 @@ proc readData {} {
     set insert [$text index insert]
     $text insert end $s\n
     $text mark set insert $insert
+}
+
+proc changeFontSize {w val} {
+    set font [font actual [$w cget -font]]
+    dict incr font -size $val
+    $w configure -font $font
+    return -code break
 }
 
 
