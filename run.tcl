@@ -33,7 +33,7 @@ set config(userCommands)    [list [list Alt-d "dictionary" "$config(dict) '%s'"]
 # Maximum menu size
 
 set command ""
-
+set wCommand ""
 
 msgcat::mcset ru "run command" "выполнить команду"
 msgcat::mcset ru "dictionary" "словарь"
@@ -56,6 +56,7 @@ ttk::style map TButton \
 
 proc main {} {
     variable config
+    variable wCommand
 
     file mkdir $config(dir)
     readSettings
