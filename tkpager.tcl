@@ -2,6 +2,8 @@
 # -*- mode: Tcl; -*- \
 exec tclsh "$0" ${1+"$@"}
 
+# (c) 2023 Alexander Danilov <alexander.a.danilov@gmail.com>
+
 package require Tk
 package require Ttk
 package require msgcat
@@ -11,22 +13,13 @@ package require inifile
 namespace import msgcat::mc msgcat::mcset
 
 
-array set config {}
+array set config {wrap {none char}}
 set config(dir) [file join $env(HOME) .config tkpager]
 set config(settingsFile) [file join $config(dir) settings]
 
 
 msgcat::mcset ru "exit" "выйти"
-
-
-ttk::style configure TButton \
-    -background lightblue \
-    -foreground black \
-    -padding {0 7} \
-    -width -4
-ttk::style map TButton \
-    -background [list active lightblue] \
-    -foreground [list disabled black]
+msgcat::mcset ru "Esc - exit" "Esc - выйти"
 
 
 proc main {args} {
@@ -44,6 +37,7 @@ proc main {args} {
 
     set f [ttk::frame .output]
     set text [text $f.text -font TkFixedFont \
+		  -wrap [lindex $config(wrap) 0] \
                   -xscrollcommand [list $f.sx set] \
                   -yscrollcommand [list $f.sy set]]
     if {[info exists config(font,size)]} {
@@ -53,6 +47,7 @@ proc main {args} {
     }
     ttk::scrollbar $f.sx -orient horizontal -command [list $f.text xview]
     ttk::scrollbar $f.sy -orient vertical -command [list $f.text yview]
+    rotext $text
 
     grid $f.text -sticky nsew
     grid $f.sy -row 0 -column 1 -sticky nsew
@@ -65,14 +60,24 @@ proc main {args} {
     wm title . tkpager
 
     bind . <Escape> quit
-    bind $text <Escape> continue
-    bind $text <KeyPress> break
     bind $text <Key-minus> [list changeFontSize %W -1]
     bind $text <Key-equal> [list changeFontSize %W 1]
+    bind $text <Key-w> [list changeWrap %W]
 
     after idle focus $text
 
     after 1 prepare $text
+}
+
+
+proc rotext {text} {
+    foreach t [bind Text] {
+	if {![string match *Key* $t] && $t ni {<<Paste>> <<PasteSelection>> <<Clear>> <<Cut>> <<Copy>>}} {
+	    bind ROText $t [bind Text $t]
+	}
+    }
+    bind ROText <Control-Key-Tab> [bind Text <Control-Key-Tab>]
+    bindtags $text [linsert [lsearch -all -inline -not [bindtags $text] Text] 1 ROText]
 }
 
 
@@ -94,14 +99,24 @@ proc readData {text} {
 }
 
 
-proc changeFontSize {w val} {
+proc changeFontSize {text val} {
     variable config
 
-    set font [font actual [$w cget -font]]
+    set font [font actual [$text cget -font]]
     dict incr font -size $val
-    $w configure -font $font
+    $text configure -font $font
 
     set config(font,size) [dict get $font -size]
+
+    return -code break
+}
+
+
+proc changeWrap {text} {
+    variable config
+
+    set config(wrap) [concat [lrange $config(wrap) 1 end] [lindex $config(wrap) 0]]
+    $text configure -wrap [lindex $config(wrap) 0]
 
     return -code break
 }
@@ -141,5 +156,6 @@ proc quit {} {
     saveSettings
     exit
 }
+
 
 main {*}$argv
