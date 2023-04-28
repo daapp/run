@@ -2,14 +2,16 @@
 # -*- mode: Tcl; -*- \
 exec tclsh "$0" ${1+"$@"}
 
-# (c) 2017-2021 Alexander Danilov <alexander.a.danilov@gmail.com>
+# (c) 2017-2023 Alexander Danilov <alexander.a.danilov@gmail.com>
 
 package require Tk
 package require Ttk
 package require msgcat
-namespace import msgcat::mc msgcat::mcset
 
 catch {package require fsdialog}
+package require tooltip
+
+namespace import msgcat::mc msgcat::mcset
 
 
 array set config [list dir [file join $env(HOME) .config run]]
@@ -66,10 +68,10 @@ proc main {} {
     set wCommand [ttk::entry $f.command \
                         -textvariable command \
                         -exportselection false]
-    button $f.browse \
-        -text [mc 🗀] \
-        -command [list browse $wCommand]
+    button $f.browse -text [mc 🗀] -command [list browse $wCommand]
+    tooltip::tooltip $f.browse [mc "Browse for file"]
     button $f.settings -text [mc ⚙] -command [list showSettings]
+    tooltip::tooltip $f.settings [mc "Settings"]
 
     ttk::separator .s1 -orient horizontal
 
