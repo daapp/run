@@ -65,7 +65,7 @@ proc main {} {
 
     set f [frame .input]
     ttk::label $f.l1 -text [mc "Shell command"]:
-    set wCommand [ttk::entry $f.command \
+    set wCommand [ttk::combobox $f.command \
                         -textvariable command \
                         -exportselection false]
     button $f.browse -text [mc 🗀] -command [list browse $wCommand]
@@ -80,8 +80,8 @@ proc main {} {
     dict set font -size [expr {int([dict get $font -size] * 0.8)}]
     set r 0
     foreach row [list \
-		     [list ⏎ [mc "run command"] Esc [mc exit]] \
-		     [list ↓ [mc "show history"] ⭾ [mc "completion (after %d characters)" $config(minCompletionSize)]]] {
+                     [list ⏎ [mc "run command"] Esc [mc exit]] \
+                     [list ↓ [mc "show history"] ⭾ [mc "completion (after %d characters)" $config(minCompletionSize)]]] {
         set ws [list]
         set c1 0
         set c2 1
@@ -138,28 +138,13 @@ proc main {} {
     grid .help - - -sticky we -padx 5 -pady 5
     grid columnconfigure . $f -weight 2
 
-    menu .historyMenu -tearoff 0
     menu .completionMenu -tearoff 0
-    readMenu .historyMenu
+    readHistory $wCommand
 
     bind . <Escape> quit
     bind $wCommand <Tab> [list completion .completionMenu $wCommand]
-    bind $wCommand <Key-Return> {run history}
-    bind $wCommand <Key-Down> {
-        if {$command ne ""} {
-            .completionMenu activate 0
-            after idle focus .completionMenu
-        } else {
-            .historyMenu post [winfo rootx $wCommand] [expr {[winfo rooty $wCommand] + [winfo height $wCommand]}]
-            after idle focus .historyMenu
-        }
-    }
-    bind .historyMenu <Unmap> {
-        after idle {
-            focus -force $wCommand
-            $wCommand icursor end
-        }
-    }
+    bind $wCommand <Key-Return> run
+
     bind .completionMenu <Escape> {
         %W unpost
         after idle {focus -force $wCommand}
@@ -170,6 +155,7 @@ proc main {} {
             $wCommand icursor end
         }
     }
+
     bind . <Map> {wm geometry . [winfo reqwidth .]x[winfo reqheight .]}
     bind . <Alt-b> {.browse invoke}
 
@@ -251,15 +237,17 @@ proc readUserCommands {fileName} {
 #
 # Runs desired command and records it in the history file
 #
-proc run {name} {
+proc run {} {
     variable command
+    variable wCommand
     variable config
 
     set command [string trim $command]
     if {$command ne ""} {
         exec /bin/sh -c $command >/dev/$config(term) </dev/$config(term) 2>/dev/$config(term) &
-        set f [open $config(historyFile) a+]
+        set f [open $config(historyFile) w]
         puts $f $command
+        puts $f [join [lrange [$wCommand cget -values] 1 end] \n]
         close $f
     }
     quit
@@ -278,28 +266,20 @@ proc runUserCommand {userCommand} {
 }
 
 
-proc readMenu {menu} {
+proc readHistory {menu} {
     variable config
+    variable wCommand
 
     if {![catch {open $config(historyFile) r} f]} {
-        set list {}
-        while {![eof $f]} {
-            set entry [gets $f]
-            if {![string length $entry]} continue
-            set list [linsert $list 0 $entry]
+        set history [list {}]
+        foreach h [lmap s [split [read $f] \n] {string trim $s}] {
+            if {$h ne ""} {
+                lappend history $h
+            }
         }
         close $f
-        if {[llength $list] > $config(historySize)} {
-            set list [lreplace $list $config(historySize) end]
-            set f [open $config(historyFile) w]
-            foreach h [lrange $list 0 $config(historySize)] {
-                puts $f $h
-            }
-            close $f
-        }
-        foreach entry $list {
-            $menu add command -label $entry -command [list set command $entry]
-        }
+        $wCommand configure -values $history
+        $wCommand current 0
     }
 }
 
