@@ -299,6 +299,7 @@ proc completion {menuName command} {
                 }
             }
         }
+        set found [lsort -unique $found]
         if {[llength $found] > 0} {
             if {[llength $found] == 1} {
                 set ::command [lindex $found 0]
