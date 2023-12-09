@@ -369,6 +369,7 @@ proc showSettings {} {
     wm title $w [mc "Settings"]
     wm resizable $w 0 0
     wm minsize $w
+    wm attributes $w -type dialog
 
     centerWindow $w
 }
