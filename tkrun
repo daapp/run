@@ -162,6 +162,7 @@ proc main {} {
     wm title . Run
     wm positionfrom . program
     wm resizable . 0 0
+    wm attributes . -type dialog
 
     tk app Run
     focus -force $wCommand
