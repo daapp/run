@@ -13,7 +13,7 @@ namespace import msgcat::mc msgcat::mcset
 
 
 set program "Network manager"
-set version 0.3
+set version 0.4
 set title "$program $version"
 
 set maxLogLines 10
@@ -26,7 +26,10 @@ array set typeMap {
 }
 
 set confFile [file join $env(HOME) .[file tail $argv0].conf]
-array set conf {}
+array set conf {
+    settings,font,list TkFixedFont
+    settings,font,log TkFixedFont
+}
 
 namespace eval conf {
     proc load {fileName} {
@@ -47,7 +50,7 @@ namespace eval conf {
     proc save {fileName newConf} {
         set f [open $fileName w]
         dict for {k v} $newConf {
-            puts $f "$k $v"
+            puts $f "$k {$v}"
         }
         close $f
     }
@@ -113,19 +116,19 @@ proc main {args} {
     pack $title.text -side top -fill x -padx 10 -pady 10 -anchor center
 
     set sl [widget::scrolledwindow .sl -scrollbar vertical]
-    set w(networks) [listbox $sl. -font TkFixedFont]
+    set w(networks) [listbox $sl. -font $conf(settings,font,list)]
     $sl setwidget $w(networks)
 
-    set w(types) [ttk::frame .types -relief raised]
+    set w(types) [ttk::labelframe .types -text "Visible networks:"]
 
     set sw [widget::scrolledwindow .sw -scrollbar vertical]
-    set w(log) [text $sw.nmLog -wrap word -height 5 -width 40]
+    set w(log) [text $sw.nmLog -wrap word -height 5 -width 40 -font $conf(settings,font,log)]
     $sw setwidget $w(log)
-    set font [expr {[dict get [font actual [$w(log) cget -font]] -size] * 2 / 3}]
-    $w(log) configure -font [list -size $font]
 
     set buttons [ttk::frame .buttons]
-    ttk::button $buttons.exit -text [mc "Exit"] -command quit
+    ttk::button $buttons.settings -text [mc "Settings"] -command settings
+    ttk::button $buttons.exit -text [mc "Esc - Exit"] -command quit
+    pack $buttons.settings -side left
     pack $buttons.exit -side right
 
     pack $title -side top -fill x
@@ -188,11 +191,11 @@ proc showConnections {} {
 
         lappend types $type
 
-        if {![info exists conf($type)]} {
-            set conf($type) show
+        if {![info exists conf(network,$type)]} {
+            set conf(network,$type) show
         }
 
-        if {$conf($type) ne "hide"} {
+        if {$conf(network,$type) ne "hide"} {
             $w(networks) insert end [format "%4s / %s" $type [dict get $conn name]]
             set color [expr {[dict get $conn active] eq "yes" ? "green" : "red"}]
             $w(networks) itemconfigure end -foreground $color -selectforeground $color
@@ -207,6 +210,8 @@ proc showConnections {} {
             pack forget $cb
         }
     }
+
+    set c 0
     foreach t [lsort $types] {
         if {[winfo exists $w(types).$t]} {
 
@@ -215,12 +220,14 @@ proc showConnections {} {
                 -offvalue hide \
                 -onvalue show \
                 -style Toolbutton \
-                -variable conf($t) \
+                -variable conf(network,$t) \
                 -command {after idle showConnections} \
-                -text $t
-            pack $w(types).$t -side left -padx 5 -pady 5
+                -text $t -padding {10 5}
+            grid $w(types).$t -row 0 -column $c -sticky ew -padx 5 -pady 5
+            incr c
         }
     }
+    grid columnconfigure $w(types) all -uniform a -weight 2
 
     $w(networks) activate $index
     $w(networks) selection anchor $index
@@ -286,5 +293,45 @@ proc quit {} {
     exit 0
 }
 
+
+proc settings {} {
+    variable conf
+    variable w
+
+    set w(settings) [toplevel .settings]
+    wm attributes $w(settings) -type dialog
+    wm title $w(settings) [mc "Settings ..."]
+
+    set mf [ttk::frame $w(settings).data]
+    ttk::label $mf.llistfont -text [mc "List font:"]
+    ttk::entry $mf.elistfont -textvariable conf(settings,font,list)
+    ttk::button $mf.blistfont -text [mc "..."] -command [list selectFont $w(settings) settings,font,list]
+
+    ttk::label $mf.llogfont -text [mc "Output font:"]
+    ttk::entry $mf.elogfont -textvariable conf(settings,font,log)
+    ttk::button $mf.blogfont -text [mc "..."] -command [list selectFont $w(settings) settings,font,log]
+    grid $mf.llistfont $mf.elistfont $mf.blistfont -sticky ew -padx 10 -pady 10
+    grid $mf.llogfont $mf.elogfont $mf.blogfont -sticky ew -padx 10 -pady 10
+
+    set buttons [ttk::frame $w(settings).buttons]
+    ttk::button $buttons.close -text [mc "Close"] -command [list destroy $w(settings)]
+    pack $buttons.close -side right
+
+    pack $buttons -side bottom -fill x -expand true -padx 10 -pady 10
+    pack $mf -side top -fill both -expand true -pady 10
+
+    bind $w(settings) <Escape> [list destroy $w(settings)]
+
+    grab set $w(settings)
+
+}
+
+
+proc selectFont {parent confKey} {
+    tk fontchooser configure -font $::conf($confKey) \
+        -parent $parent \
+        -command [list set ::conf($confKey)]
+    tk fontchooser show
+}
 
 main $argv
