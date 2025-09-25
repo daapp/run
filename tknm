@@ -205,9 +205,9 @@ proc showConnections {} {
     # hide unexistent types
     foreach cb [winfo children $w(types)] {
         if {[lindex [split $cb .] end] in $types} {
-            pack $cb
+            grid $cb
         } else {
-            pack forget $cb
+            grid forget $cb
         }
     }
 
@@ -219,7 +219,6 @@ proc showConnections {} {
             ttk::checkbutton $w(types).$t \
                 -offvalue hide \
                 -onvalue show \
-                -style Toolbutton \
                 -variable conf(network,$t) \
                 -command {after idle showConnections} \
                 -text $t -padding {10 5}
@@ -227,7 +226,7 @@ proc showConnections {} {
             incr c
         }
     }
-    grid columnconfigure $w(types) all -uniform a -weight 2
+#    grid columnconfigure $w(types) all -uniform a -weight 2
 
     $w(networks) activate $index
     $w(networks) selection anchor $index
